@@ -230,3 +230,10 @@ body.has-player .footer { padding-bottom:6rem; }
 .voice-dock:hover { transform:translateY(-2px); }
 @media (max-width:700px) { .voice-dock { right:.7rem; bottom:5.5rem; padding:.7rem; } .voice-dock span { display:none; } }
 @media print { .voice-dock { display:none !important; } }
+
+/* LAB-FIG: laboratoriya qurilmasi sxemalari va suratlari */
+.lab-fig { margin:1.2rem auto; text-align:center; }
+.lab-fig img { display:block; margin:0 auto; max-width:min(100%, var(--fw, 560px)); height:auto; background:#fff; border-radius:12px; padding:.6rem; border:1px solid rgba(148,163,184,.35); }
+.lab-fig figcaption { font-size:.85rem; color:var(--muted, #94a3b8); margin-top:.5rem; }
+.lab-figs { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; align-items:end; }
+.lab-figs .lab-fig { margin:.4rem 0; }

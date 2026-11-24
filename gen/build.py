@@ -6,12 +6,15 @@ from labs_e1 import L as E1
 from labs_e2 import L as E2
 from labs_o1 import L as O1
 from labs_o2 import L as O2
+from labs_docx import OVR as DOCX_OVR
 import other
 from tours import T as TOURS
 from alifbo import html_to_new
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 LABS = E1 + E2 + O1 + O2
+for _L in LABS:  # Kafedra laboratoriya qo'llanmasi (docx) asosidagi yangilangan mazmun
+    _L.update(DOCX_OVR.get(_L["n"], {}))
 ELEC, OPT = LABS[:18], LABS[18:]
 SIMNAME = {L["sim"]: L["short"] for L in LABS}
 SIMNAME["newton"] = "Nyuton halqalari"
@@ -86,9 +89,27 @@ def pager(prev, nxt):
     return f'<nav class="pager" aria-label="Sahifalar">{p}{n}</nav>'
 
 
+def proc_html(items):
+    """Tartib ro'yxati: oddiy satrlar raqamlanadi; ("h", "1-topshiriq") yangi guruh sarlavhasi."""
+    out, cur = [], []
+    for it in items:
+        if isinstance(it, tuple) and it[0] == "h":
+            if cur: out.append(ul(cur, True)); cur = []
+            out.append(f'<h3>{it[1]}</h3>')
+        elif isinstance(it, tuple) and it[0] == "p":
+            if cur: out.append(ul(cur, True)); cur = []
+            out.append(it[1])
+        else:
+            cur.append(it)
+    if cur: out.append(ul(cur, True))
+    return "".join(out)
+
+
 def meas_table(cols, nrows):
     h = "".join(f"<th>{c}</th>" for c in cols)
-    r = "".join("<tr>" + "".join('<td contenteditable="true"></td>' for _ in cols) + "</tr>" for _ in range(nrows))
+    if isinstance(nrows, int):
+        nrows = [[] for _ in range(nrows)]
+    r = "".join("<tr>" + "".join((f"<td>{row[k]}</td>" if k < len(row) and row[k] != "" else '<td contenteditable="true"></td>') for k in range(len(cols))) + "</tr>" for row in nrows)
     return f'<div class="tw meas"><table class="t meas-t"><thead><tr>{h}</tr></thead><tbody>{r}</tbody></table></div><p class="muted" style="font-size:.82rem">Jadval katakchalariga bevosita yozish mumkin (ma’lumotlar sahifa yopilganda saqlanmaydi — hisobotga ko‘chirib oling).</p>'
 
 
@@ -110,14 +131,25 @@ def lab_page(L):
     S.append(sec("jihoz", 2, "Kerakli jihozlar", ul(L["equip"]) + '<div class="callout info"><b>Jihoz yetishmasa</b>Ishning o‘lchash qismini quyidagi virtual laboratoriyada bajarib, natijalarni xuddi shu jadvalga yozing; hisobotda buni ko‘rsating.</div>'))
     th = "".join(f"<h3>{n}.{k+1}. {h}</h3>{b}" for k, (h, b) in enumerate(L["theory"]))
     S.append(sec("nazariya", 3, "Nazariy qism", th))
-    cols, rows = L["tbl"]
-    S.append(sec("tartib", 4, "Ishni bajarish tartibi", ul(L["proc"], True) + "<h3>O‘lchash natijalari jadvali</h3>" + meas_table(cols, rows)))
-    S.append(sec("hisob", 5, "Natijalarni qayta ishlash va xatoliklar", L["calc"] + f'<p class="muted">Xatoliklar nazariyasi: <a href="kirish.html#xatolik">laboratoriyaga kirish bo‘limi</a>.</p><div class="grid grid-2">{ERR_CALC}{MNK_CALC}</div>'))
+    if "tbls" in L:
+        tbl_html = "".join(f'<h3>{cap}</h3>' + meas_table(cols, rows) for cap, cols, rows in L["tbls"])
+    else:
+        cols, rows = L["tbl"]
+        tbl_html = "<h3>O‘lchash natijalari jadvali</h3>" + meas_table(cols, rows)
+    S.append(sec("tartib", 4, "Ishni bajarish tartibi", proc_html(L["proc"]) + tbl_html))
+    concl = ("<h3>Xulosalar</h3>" + ul(L["concl"])) if L.get("concl") else ""
+    S.append(sec("hisob", 5, "Natijalarni qayta ishlash va xatoliklar", L["calc"] + concl + f'<p class="muted">Xatoliklar nazariyasi: <a href="kirish.html#xatolik">laboratoriyaga kirish bo‘limi</a>.</p><div class="grid grid-2">{ERR_CALC}{MNK_CALC}</div>'))
     cond, sol = L["example"]
     S.append(sec("misol", 6, "Namunaviy hisob", f'<div class="example"><div class="ex-h">Namunaviy ma’lumotlar bilan hisob</div><div class="ex-b"><p><b>Shart.</b> {cond}</p><details><summary>Yechimni ko‘rsatish</summary><p>{sol}</p></details></div></div>'))
     S.append(sec("model", 7, f"Virtual laboratoriya: {L['short']}", f'{sim_block(L["sim"], f"l{n}")}<h3>Virtual laboratoriyadagi topshiriqlar</h3>{ul(L["simtask"], True)}<p class="muted" style="font-size:.85rem">Model o‘quv maqsadida soddalashtirilgan. “Asbob ko‘rsatishi” deb belgilangan qiymatlarga real o‘lchashdagi kabi kichik tasodifiy chetlanish qo‘shilgan — takroriy o‘lchashlar uchun foydalaning.</p>'))
     S.append(sec("xavfsizlik", 8, "Texnika xavfsizligi", '<div class="callout warn"><b>Ishni boshlashdan oldin</b>Zanjir yoki qurilma o‘qituvchi tekshirmaguncha ishga tushirilmaydi. Umumiy qoidalar: <a href="kirish.html#xavfsizlik">laboratoriyaga kirish</a>.</div>' + ul(L["safety"])))
-    S.append(sec("savollar", 9, "Himoya uchun nazorat savollari", ul(L["questions"], True)))
+    extra = ""
+    if L.get("method"):
+        mname, mbody = L["method"]
+        extra += f'<h3>Mustahkamlash: {mname}</h3>{mbody}'
+    if L.get("blits"):
+        extra += "<h3>Blits-so‘rov</h3>" + ul(L["blits"], True)
+    S.append(sec("savollar", 9, "Himoya uchun nazorat savollari", ul(L["questions"], True) + extra))
     S.append(sec("test", 10, "Nazorat testi (10 savol, o‘z-o‘zini tekshirish)", quiz(shuffled_quiz(L["quiz"], 2000 + n), f"l{n}") + '<p class="muted" style="font-size:.85rem;margin-top:.6rem">Bu test o‘z-o‘zini tekshirish uchun; rasmiy oraliq nazorat HEMIS’da o‘tkaziladi.</p>'))
     ai = (f"Men pedagogika oliygohining fizika yo‘nalishi talabasiman. “{strip_tags(L['title'])}” laboratoriya ishini bajardim.\n"
           "1) Mening o‘lchash jadvalimni tekshir: birliklar, xonalar soni, aniq xato yozuvlar.\n"
